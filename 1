@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>Nurse Duty Roster</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<!-- SheetJS for Excel export -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --c-bg:       #F6F8FA;
+  --c-surface:  #FFFFFF;
+  --c-border:   #E2E8F0;
+  --c-border2:  #CBD5E1;
+  --c-text:     #1E293B;
+  --c-muted:    #64748B;
+  --c-blue:     #3B82F6;
+  --c-blue-lt:  #EFF6FF;
+  --c-green:    #22C55E;
+  --c-green-lt: #F0FDF4;
+  --c-amber:    #F59E0B;
+  --c-amber-lt: #FFFBEB;
+  --c-red:      #EF4444;
+  --c-red-lt:   #FEF2F2;
+  --c-teal-lt:  #F0FDFA;
+  --c-purple:   #8B5CF6;
+  --c-purple-lt:#F5F3FF;
+  --r-sm:6px; --r-md:10px; --r-lg:16px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.08);
+  --hh:56px; --th:50px;
+}
+html, body { height:100%; }
+body {
+  font-family:'DM Sans',system-ui,sans-serif;
+  background:var(--c-bg); color:var(--c-text);
+  font-size:14px; line-height:1.6; -webkit-text-size-adjust:100%;
+}
+
+/* ── SHELL ── */
+#app { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+
+/* ── HEADER ── */
+#header {
+  height:var(--hh); flex-shrink:0;
+  background:var(--c-surface); border-bottom:1px solid var(--c-border);
+  box-shadow:var(--shadow-sm); padding:0 18px;
+  display:flex; align-items:center; justify-content:space-between;
+  position:relative; z-index:200; gap:10px;
+}
+.brand { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.logo {
+  width:34px; height:34px; border-radius:var(--r-sm); flex-shrink:0;
+  background:linear-gradient(135deg,#3B82F6,#0D9488);
+  display:flex; align-items:center; justify-content:center;
+  color:#fff; font-size:17px; font-weight:600;
+}
+.brand-text h1 { font-size:15px; font-weight:600; letter-spacing:-0.3px; line-height:1.2; }
+.brand-text .sub { font-size:11px; color:var(--c-muted); }
+
+/* Month selector in header */
+#month-wrap {
+  display:flex; align-items:center; gap:7px;
+  background:var(--c-blue-lt); border:1px solid #BFDBFE;
+  border-radius:var(--r-sm); padding:5px 10px;
+  flex-shrink:0;
+}
+#month-wrap label { font-size:11px; font-weight:600; color:#1D4ED8; white-space:nowrap; }
+#month-sel {
+  border:none; background:transparent; font-family:inherit;
+  font-size:13px; font-weight:600; color:#1D4ED8;
+  outline:none; cursor:pointer;
+}
+
+.hdr-right { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.hdr-legend { display:flex; gap:10px; align-items:center; }
+.leg-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--c-muted); }
+.leg-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+/* ── BUTTONS ── */
+.btn {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:6px 12px; border-radius:var(--r-sm);
+  font-size:13px; font-weight:500; cursor:pointer;
+  border:1px solid var(--c-border2); background:var(--c-surface); color:var(--c-text);
+  font-family:inherit; transition:background .15s,border-color .15s,transform .1s;
+  white-space:nowrap; -webkit-tap-highlight-color:transparent;
+}
+.btn:hover { background:var(--c-bg); border-color:var(--c-blue); }
+.btn:active { transform:scale(0.96); }
+.btn-p  { background:var(--c-blue);   color:#fff; border-color:var(--c-blue); }
+.btn-p:hover  { background:#2563EB; border-color:#2563EB; }
+.btn-g  { background:var(--c-green);  color:#fff; border-color:var(--c-green); }
+.btn-g:hover  { background:#16A34A; border-color:#16A34A; }
+.btn-pu { background:var(--c-purple); color:#fff; border-color:var(--c-purple); }
+.btn-pu:hover { background:#7C3AED; border-color:#7C3AED; }
+.btn-s  { padding:5px 10px; font-size:12px; }
+
+/* Save feedback */
+#save-status {
+  font-size:11px; color:var(--c-green); font-weight:500;
+  opacity:0; transition:opacity .3s; white-space:nowrap;
+}
+#save-status.show { opacity:1; }
+
+/* ── MOBILE TAB BAR ── */
+#tab-bar {
+  display:none; flex-shrink:0;
+  background:var(--c-surface); border-bottom:1px solid var(--c-border);
+  overflow-x:auto; scrollbar-width:none;
+}
+#tab-bar::-webkit-scrollbar { display:none; }
+.tabs { display:flex; min-width:max-content; width:100%; }
+.tab-btn {
+  flex:1; min-width:72px; padding:12px 7px 10px;
+  border:none; background:none; font-family:inherit;
+  font-size:11px; font-weight:500; color:var(--c-muted);
+  cursor:pointer; border-bottom:2px solid transparent;
+  transition:color .15s,border-color .15s;
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  -webkit-tap-highlight-color:transparent;
+}
+.tab-btn .ti { font-size:16px; line-height:1; }
+.tab-btn.active { color:var(--c-blue); border-bottom-color:var(--c-blue); }
+
+/* ── MAIN LAYOUT ── */
+#main { display:flex; flex:1; overflow:hidden; min-height:0; }
+
+/* ── PANES ── */
+.pane { display:flex; flex-direction:column; overflow:hidden; flex-shrink:0; }
+#left-pane   { width:310px; background:var(--c-surface); border-right:1px solid var(--c-border); }
+#center-pane { flex:1; min-width:0; background:var(--c-bg); }
+#right-pane  { width:272px; background:var(--c-surface); border-left:1px solid var(--c-border); }
+
+.ph {
+  padding:11px 15px; border-bottom:1px solid var(--c-border);
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  background:var(--c-surface); flex-shrink:0; flex-wrap:wrap;
+}
+.ph h2 { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--c-muted); }
+
+/* ── NURSE LIST ── */
+#nurse-list { flex:1; overflow-y:auto; padding:10px; }
+.nc {
+  background:var(--c-bg); border:1px solid var(--c-border);
+  border-radius:var(--r-md); padding:11px 12px; margin-bottom:8px;
+  position:relative; transition:border-color .15s,box-shadow .15s;
+}
+.nc:hover { border-color:var(--c-border2); box-shadow:var(--shadow-sm); }
+.nc-row { display:flex; align-items:center; gap:7px; margin-bottom:7px; }
+.nc-row:last-child { margin-bottom:0; }
+.nc-num {
+  width:21px; height:21px; border-radius:50%; background:var(--c-blue); color:#fff;
+  font-size:10px; font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.nc input[type=text] {
+  flex:1; min-width:0; border:1px solid var(--c-border); border-radius:var(--r-sm);
+  padding:6px 9px; font-family:inherit; font-size:13px;
+  background:var(--c-surface); color:var(--c-text); outline:none; transition:border-color .15s;
+}
+.nc input[type=text]:focus { border-color:var(--c-blue); }
+.nc select {
+  border:1px solid var(--c-border); border-radius:var(--r-sm);
+  padding:5px 6px; font-family:inherit; font-size:12px;
+  background:var(--c-surface); color:var(--c-text);
+  cursor:pointer; outline:none; transition:border-color .15s;
+}
+.nc select:focus { border-color:var(--c-blue); }
+.sbadge { font-family:'DM Mono',monospace; font-size:10px; font-weight:500; padding:2px 7px; border-radius:99px; white-space:nowrap; flex-shrink:0; }
+.s3 { background:var(--c-green-lt); color:#15803D; }
+.s2 { background:var(--c-amber-lt); color:#B45309; }
+.s1 { background:var(--c-red-lt);   color:#B91C1C; }
+.del-btn {
+  position:absolute; top:8px; right:8px; width:20px; height:20px;
+  border:none; background:none; color:var(--c-muted); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:4px; font-size:16px; line-height:1;
+  transition:color .15s,background .15s; -webkit-tap-highlight-color:transparent;
+}
+.del-btn:hover { color:var(--c-red); background:var(--c-red-lt); }
+
+/* ── GRID ── */
+.day-ctrl { display:flex; align-items:center; gap:6px; font-size:13px; }
+.day-ctrl label { color:var(--c-muted); white-space:nowrap; }
+.day-ctrl input[type=number] {
+  width:52px; padding:5px 7px; border:1px solid var(--c-border); border-radius:var(--r-sm);
+  font-family:inherit; font-size:13px; outline:none; background:var(--c-surface); transition:border-color .15s;
+}
+.day-ctrl input[type=number]:focus { border-color:var(--c-blue); }
+
+#grid-wrapper { overflow:auto; flex:1; -webkit-overflow-scrolling:touch; }
+#duty-table { border-collapse:separate; border-spacing:0; min-width:max-content; width:100%; }
+#duty-table thead th {
+  position:sticky; top:0; z-index:30; background:var(--c-bg);
+  border-bottom:2px solid var(--c-border2);
+  padding:8px 5px; font-size:10px; font-weight:600; color:var(--c-muted);
+  text-transform:uppercase; letter-spacing:.4px; text-align:center; white-space:nowrap; min-width:96px;
+}
+#duty-table thead th:first-child { left:0; z-index:40; min-width:130px; text-align:left; padding-left:13px; }
+#duty-table tbody tr:nth-child(even) td { background:#FAFBFC; }
+#duty-table tbody tr:hover td { background:var(--c-blue-lt); }
+#duty-table td {
+  border-bottom:1px solid var(--c-border); border-right:1px solid var(--c-border);
+  padding:5px; vertical-align:middle; background:var(--c-surface); transition:background .1s;
+}
+#duty-table td:first-child {
+  position:sticky; left:0; z-index:20; background:var(--c-surface);
+  border-right:2px solid var(--c-border2); padding:7px 13px;
+  font-weight:500; font-size:12px; min-width:130px;
+}
+#duty-table tbody tr:nth-child(even) td:first-child { background:#FAFBFC; }
+#duty-table tbody tr:hover td:first-child { background:var(--c-blue-lt); }
+.nnc { display:flex; align-items:center; gap:7px; }
+.ndot { width:7px; height:7px; border-radius:50%; background:var(--c-blue); flex-shrink:0; }
+
+/* Shift select */
+.ss {
+  width:100%; min-width:88px; border:1px solid var(--c-border); border-radius:var(--r-sm);
+  padding:5px 20px 5px 5px; font-family:inherit; font-size:11px;
+  background:var(--c-surface); color:var(--c-text);
+  cursor:pointer; outline:none; appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2364748B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 5px center;
+  transition:border-color .15s,background .15s;
+}
+.ss:focus { border-color:var(--c-blue); }
+.ss.overload { border-color:var(--c-red)!important; background-color:var(--c-red-lt)!important; }
+.ss.sm { border-color:#FCD34D; background-color:#FEFCE8; }
+.ss.se { border-color:#6EE7B7; background-color:var(--c-teal-lt); }
+.ss.sn { border-color:#A5B4FC; background-color:#EEF2FF; }
+.ss.sc { border-color:var(--c-amber); background-color:var(--c-amber-lt); }
+.ss.so { color:var(--c-muted); }
+
+/* Overload tooltip */
+.ow { position:relative; display:block; }
+.ow .tip {
+  display:none; position:absolute; bottom:calc(100% + 4px); left:50%; transform:translateX(-50%);
+  background:#1E293B; color:#fff; font-size:10px; padding:3px 8px;
+  border-radius:4px; white-space:nowrap; z-index:99; pointer-events:none;
+}
+.ow:hover .tip { display:block; }
+
+/* ── RIGHT PANE (EVAL) ── */
+#day-sel-wrap { padding:10px 13px; border-bottom:1px solid var(--c-border); flex-shrink:0; }
+#day-sel-wrap label { font-size:10px; color:var(--c-muted); font-weight:600; text-transform:uppercase; letter-spacing:.5px; display:block; margin-bottom:5px; }
+#day-selector { width:100%; border:1px solid var(--c-border); border-radius:var(--r-sm); padding:7px 9px; font-family:inherit; font-size:13px; background:var(--c-bg); color:var(--c-text); outline:none; cursor:pointer; }
+#day-selector:focus { border-color:var(--c-blue); }
+#score-cards { padding:10px 13px; flex:1; overflow-y:auto; }
+
+.sb { background:var(--c-bg); border:1px solid var(--c-border); border-radius:var(--r-md); margin-bottom:10px; overflow:hidden; transition:border-color .2s; }
+.sb.good { border-color:var(--c-green); }
+.sb.mid  { border-color:var(--c-amber); }
+.sb.poor { border-color:var(--c-red); }
+.sbh { display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-bottom:1px solid var(--c-border); font-size:13px; font-weight:600; }
+.sbl { display:flex; align-items:center; gap:7px; }
+.fs  { font-family:'DM Mono',monospace; font-size:12px; font-weight:500; padding:2px 9px; border-radius:99px; }
+.fg  { background:var(--c-green-lt); color:#15803D; }
+.fm  { background:var(--c-amber-lt); color:#B45309; }
+.fp  { background:var(--c-red-lt);   color:#B91C1C; }
+.sbb { padding:9px 12px; }
+.sr  { display:flex; align-items:center; justify-content:space-between; padding:2px 0; font-size:12px; }
+.sl  { color:var(--c-muted); }
+.sv  { font-weight:500; font-family:'DM Mono',monospace; font-size:12px; }
+.pr  { display:flex; gap:4px; flex-wrap:wrap; margin-top:5px; }
+.pill    { font-size:10px; padding:2px 7px; border-radius:99px; font-weight:500; font-family:'DM Mono',monospace; }
+.ph-p { background:var(--c-green-lt); color:#15803D; }
+.pm-p { background:var(--c-amber-lt); color:#B45309; }
+.pl-p { background:var(--c-red-lt);   color:#B91C1C; }
+.nn { font-size:12px; color:var(--c-muted); font-style:italic; }
+
+/* Mobile legend */
+#mob-leg { display:none; padding:9px 13px; border-bottom:1px solid var(--c-border); gap:10px; flex-wrap:wrap; flex-shrink:0; }
+#mob-leg .leg-item { font-size:11px; }
+
+/* ── SUMMARY BAR ── */
+#summary-bar {
+  background:var(--c-surface); border-top:1px solid var(--c-border);
+  padding:8px 16px; display:flex; gap:12px; align-items:center;
+  font-size:11px; color:var(--c-muted); flex-wrap:wrap; flex-shrink:0;
+}
+.si { display:flex; align-items:center; gap:5px; }
+.sd { width:7px; height:7px; border-radius:50%; }
+
+/* ── EMPTY STATES ── */
+.empty { text-align:center; padding:36px 20px; color:var(--c-muted); }
+.empty svg { opacity:.3; margin-bottom:10px; }
+
+/* ── TOAST NOTIFICATION ── */
+#toast {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:#1E293B; color:#fff; font-size:13px; font-weight:500;
+  padding:10px 20px; border-radius:var(--r-md);
+  opacity:0; transition:opacity .25s,transform .25s;
+  pointer-events:none; z-index:999; white-space:nowrap;
+  box-shadow:var(--shadow-md);
+}
+#toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+#toast.green { background:#15803D; }
+#toast.blue  { background:#1D4ED8; }
+
+/* ── MONTH BADGE on grid header ── */
+#month-badge {
+  font-size:12px; font-weight:600; color:#1D4ED8;
+  background:var(--c-blue-lt); border:1px solid #BFDBFE;
+  padding:3px 10px; border-radius:99px; white-space:nowrap;
+}
+
+/* ── SCROLLBARS ── */
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--c-border2); border-radius:99px; }
+::-webkit-scrollbar-thumb:hover { background:#94A3B8; }
+
+/* ════════════════════════════
+   RESPONSIVE — TABLET ≤ 900px
+════════════════════════════ */
+@media (max-width:900px) {
+  #left-pane  { width:265px; }
+  #right-pane { width:240px; }
+  .hdr-legend { display:none; }
+  #mob-leg { display:flex; }
+}
+
+/* ════════════════════════════
+   RESPONSIVE — MOBILE ≤ 640px
+════════════════════════════ */
+@media (max-width:640px) {
+  #tab-bar { display:block; }
+  #main { display:block; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .pane { display:none; width:100%!important; border:none!important; height:auto; overflow:visible; }
+  .pane.ap { display:flex; }
+  #nurse-list { overflow:visible; }
+  #left-pane .ph { position:sticky; top:0; z-index:10; }
+  #grid-wrapper { overflow-x:auto; overflow-y:auto; max-height:calc(100vh - var(--hh) - var(--th) - 50px); }
+  #center-pane .ph { position:sticky; top:0; z-index:10; }
+  #score-cards { overflow:visible; }
+  #right-pane  { overflow:visible; }
+  .ss { font-size:12px; padding:7px 22px 7px 7px; min-width:78px; }
+  .nc select { font-size:13px; padding:7px 8px; }
+  #header { padding:0 12px; gap:6px; }
+  .brand-text .sub { display:none; }
+  #mob-leg { display:flex; }
+  #summary-bar { padding:7px 12px; gap:8px; }
+  .hdr-right .btn-g { display:none; } /* hide Excel button from header on mobile – available in scores tab */
+  #save-status { display:none; }
+  #month-wrap label { display:none; }
+}
+@media (max-width:380px) {
+  .brand-text h1 { font-size:13px; }
+  .tab-btn { font-size:10px; min-width:60px; }
+  #duty-table thead th { min-width:78px; }
+  #duty-table td:first-child, #duty-table thead th:first-child { min-width:96px; }
+  .ss { min-width:68px; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ══ HEADER ══ -->
+<header id="header">
+  <div class="brand">
+    <div class="logo">N</div>
+    <div class="brand-text">
+      <h1>Nurse Duty Roster</h1>
+      <div class="sub">Shift Balance &amp; Quality Evaluation</div>
+    </div>
+  </div>
+
+  <!-- Month Selector -->
+  <div id="month-wrap">
+    <label>Month:</label>
+    <select id="month-sel" onchange="onMonthChange()"></select>
+  </div>
+
+  <div class="hdr-right">
+    <div class="hdr-legend">
+      <div class="leg-item"><div class="leg-dot" style="background:#FCD34D"></div>Morning</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#6EE7B7"></div>Evening</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#A5B4FC"></div>Night</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#FCA5A5"></div>Overload</div>
+    </div>
+    <span id="save-status">✓ Saved</span>
+    <button class="btn btn-g btn-s" onclick="exportExcel()" title="Download Excel">⬇ Excel</button>
+    <button class="btn btn-p btn-s"  onclick="addNurse()">+ Nurse</button>
+  </div>
+</header>
+
+<!-- ══ MOBILE TAB BAR ══ -->
+<nav id="tab-bar">
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="left-pane"   onclick="switchTab('left-pane')"><span class="ti">👩‍⚕️</span>Nurses</button>
+    <button class="tab-btn"        data-tab="center-pane" onclick="switchTab('center-pane')"><span class="ti">📋</span>Roster</button>
+    <button class="tab-btn"        data-tab="right-pane"  onclick="switchTab('right-pane')"><span class="ti">📊</span>Scores</button>
+  </div>
+</nav>
+
+<!-- ══ MAIN ══ -->
+<div id="main">
+
+  <!-- Left: Nurses -->
+  <aside id="left-pane" class="pane ap">
+    <div class="ph">
+      <h2>Nurses <span id="nurse-count" style="font-weight:400;color:var(--c-muted);text-transform:none;letter-spacing:0;font-size:12px;"></span></h2>
+      <button class="btn btn-p btn-s" onclick="addNurse()">+ Add</button>
+    </div>
+    <div id="nurse-list">
+      <div class="empty" id="nurse-empty">
+        <svg width="36" height="36" fill="none"><circle cx="18" cy="18" r="16" stroke="#64748B" stroke-width="2"/><path d="M18 10v8M14 14h8" stroke="#64748B" stroke-width="2" stroke-linecap="round"/></svg>
+        <p style="font-size:13px">Add nurses to begin</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Center: Duty Grid -->
+  <main id="center-pane" class="pane">
+    <div class="ph">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <h2>Duty Grid</h2>
+        <span id="month-badge"></span>
+      </div>
+      <div class="day-ctrl">
+        <label>Days:</label>
+        <input type="number" id="day-count" value="30" min="1" max="31" onchange="onDayCountChange()" />
+      </div>
+    </div>
+    <div id="grid-wrapper">
+      <table id="duty-table">
+        <thead><tr id="duty-hr"></tr></thead>
+        <tbody id="duty-tb"></tbody>
+      </table>
+      <div class="empty" id="grid-empty" style="padding:50px 20px">
+        <p style="font-size:13px">Add nurses and the duty grid will appear here.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Right: Evaluation -->
+  <aside id="right-pane" class="pane">
+    <div class="ph"><h2>Evaluation</h2></div>
+    <div id="mob-leg">
+      <div class="leg-item"><div class="leg-dot" style="background:#FCD34D"></div>Morning</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#6EE7B7"></div>Evening</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#A5B4FC"></div>Night</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#FCA5A5"></div>Overload</div>
+    </div>
+    <div id="day-sel-wrap">
+      <label>Select Day</label>
+      <select id="day-selector" onchange="renderEval()"></select>
+    </div>
+    <div id="score-cards">
+      <div class="empty" id="eval-empty"><p style="font-size:13px">Assign shifts to see scores.</p></div>
+    </div>
+    <!-- Excel download button visible in scores tab on mobile -->
+    <div style="padding:12px 13px;border-top:1px solid var(--c-border);display:none" id="mob-excel-wrap">
+      <button class="btn btn-g" style="width:100%;justify-content:center" onclick="exportExcel()">⬇ Download Excel Roster</button>
+    </div>
+  </aside>
+
+</div>
+
+<!-- ══ SUMMARY BAR ══ -->
+<footer id="summary-bar">
+  <div class="si"><div class="sd" style="background:var(--c-green)"></div><span id="sum-good">0 Good</span></div>
+  <div class="si"><div class="sd" style="background:var(--c-amber)"></div><span id="sum-mid">0 Medium</span></div>
+  <div class="si"><div class="sd" style="background:var(--c-red)"></div><span id="sum-poor">0 Poor</span></div>
+  <span id="sum-ol" style="color:var(--c-red);margin-left:auto;font-weight:500"></span>
+</footer>
+
+<!-- ══ TOAST ══ -->
+<div id="toast"></div>
+
+</div><!-- /app -->
+
+<script>
+/* ══════════════════════════════════════════
+   CONSTANTS & DEFAULTS
+══════════════════════════════════════════ */
+const SHIFT_OPTS = [
+  {v:"Off",             l:"Off"},
+  {v:"Morning",         l:"☀ Morning"},
+  {v:"Evening",         l:"🌤 Evening"},
+  {v:"Night",           l:"🌙 Night"},
+  {v:"Morning,Evening", l:"☀🌤 Morning+Evening"},
+  {v:"Morning,Night",   l:"☀🌙 Morning+Night"},
+  {v:"Evening,Night",   l:"🌤🌙 Evening+Night"},
+];
+const QS = {High:3,Medium:2,Low:1};
+const MONTHS = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December"
+];
+const DEFAULT_NURSES = [
+  {name:"Neelam",   designation:"N.A.",          quality:"Medium"},
+  {name:"Kuldeep",  designation:"GNM",           quality:"High"},
+  {name:"Deepika",  designation:"GNM",           quality:"High"},
+  {name:"Avita",    designation:"GNM",           quality:"High"},
+  {name:"Rahil",    designation:"ANM",           quality:"High"},
+  {name:"Rinki",    designation:"ANM",           quality:"Low"},
+  {name:"Sunita",   designation:"ANM",           quality:"Low"},
+  {name:"Anjali",   designation:"GNM",           quality:"Medium"},
+  {name:"Saloni",   designation:"GNM",           quality:"Low"},
+  {name:"Priyanka", designation:"GNM",           quality:"Low"},
+  {name:"Sneha",    designation:"GNM",           quality:"Low"},
+  {name:"Naghma",   designation:"GNM",           quality:"Low"},
+  {name:"Shiva",    designation:"OT Technician", quality:"High"},
+  {name:"Rukhsar",  designation:"GNM",           quality:"Low"},
+];
+
+/* ══════════════════════════════════════════
+   STATE
+══════════════════════════════════════════ */
+let nurses  = [];   // [{id,name,designation,quality}]
+let nextId  = 1;
+let shifts  = {};   // shifts[nurseId][day] = "Morning" etc (per month)
+let currentMonthKey = "";  // e.g. "2025-04"
+let saveTimer = null;
+
+/* ══════════════════════════════════════════
+   STORAGE KEY HELPERS
+   nurses  → "roster_nurses"          (global, shared across months)
+   shifts  → "roster_shifts_YYYY-MM"  (per month)
+   days    → "roster_days_YYYY-MM"    (day count per month)
+══════════════════════════════════════════ */
+function storageKey(type) {
+  if (type === 'nurses') return 'roster_nurses';
+  if (type === 'shifts') return `roster_shifts_${currentMonthKey}`;
+  if (type === 'days')   return `roster_days_${currentMonthKey}`;
+}
+
+function saveAll() {
+  try {
+    // Save nurses (global)
+    localStorage.setItem(storageKey('nurses'), JSON.stringify({nurses, nextId}));
+    // Save shifts for this month
+    localStorage.setItem(storageKey('shifts'), JSON.stringify(shifts));
+    // Save day count for this month
+    localStorage.setItem(storageKey('days'), document.getElementById('day-count').value);
+    // Flash save status
+    const ss = document.getElementById('save-status');
+    ss.classList.add('show');
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => ss.classList.remove('show'), 2000);
+  } catch(e) {
+    showToast('Could not save — storage may be full', 'red');
+  }
+}
+
+function loadNurses() {
+  const raw = localStorage.getItem(storageKey('nurses'));
+  if (raw) {
+    try {
+      const data = JSON.parse(raw);
+      nurses = data.nurses || [];
+      nextId = data.nextId || (nurses.length + 1);
+      return true;
+    } catch(e) {}
+  }
+  return false;
+}
+
+function loadShiftsForMonth() {
+  const raw = localStorage.getItem(storageKey('shifts'));
+  if (raw) {
+    try { shifts = JSON.parse(raw); return true; } catch(e) {}
+  }
+  return false;
+}
+
+function loadDaysForMonth() {
+  const raw = localStorage.getItem(storageKey('days'));
+  if (raw) {
+    document.getElementById('day-count').value = parseInt(raw) || 30;
+    return true;
+  }
+  document.getElementById('day-count').value = daysInMonth(currentMonthKey);
+  return false;
+}
+
+/* ══════════════════════════════════════════
+   MONTH LOGIC
+══════════════════════════════════════════ */
+function daysInMonth(monthKey) {
+  // monthKey = "YYYY-MM"
+  const [y, m] = monthKey.split('-').map(Number);
+  return new Date(y, m, 0).getDate();
+}
+
+function buildMonthSelector() {
+  const sel = document.getElementById('month-sel');
+  sel.innerHTML = '';
+  const now = new Date();
+  // Show 12 months: 6 past, current, 5 future
+  for (let offset = -6; offset <= 5; offset++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const key = `${y}-${m}`;
+    const o = document.createElement('option');
+    o.value = key;
+    o.textContent = `${MONTHS[d.getMonth()]} ${y}`;
+    if (offset === 0) o.selected = true;
+    sel.appendChild(o);
+  }
+}
+
+function getSelectedMonth() {
+  return document.getElementById('month-sel').value;
+}
+
+function onMonthChange() {
+  // Save current month data first
+  saveAll();
+  // Switch month
+  currentMonthKey = getSelectedMonth();
+  updateMonthBadge();
+  // Load shifts for new month (nurses stay global)
+  const hadShifts = loadShiftsForMonth();
+  loadDaysForMonth();
+  // If no shifts saved, initialise empty shifts for all nurses
+  if (!hadShifts) initShiftsForNurses();
+  rebuildGrid();
+  refresh();
+}
+
+function updateMonthBadge() {
+  const [y, m] = currentMonthKey.split('-').map(Number);
+  document.getElementById('month-badge').textContent = `${MONTHS[m-1]} ${y}`;
+  document.title = `Roster — ${MONTHS[m-1]} ${y}`;
+}
+
+/* ══════════════════════════════════════════
+   MOBILE TABS
+══════════════════════════════════════════ */
+function switchTab(id) {
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('ap'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('ap');
+  document.querySelector(`.tab-btn[data-tab="${id}"]`).classList.add('active');
+  document.getElementById('main').scrollTop = 0;
+  // Show mobile Excel button only on scores tab
+  const mex = document.getElementById('mob-excel-wrap');
+  if (mex) mex.style.display = id === 'right-pane' ? '' : 'none';
+}
+
+/* ══════════════════════════════════════════
+   NURSE MANAGEMENT
+══════════════════════════════════════════ */
+function addNurse() {
+  const id = nextId++;
+  nurses.push({id, name:`Nurse ${id}`, designation:"GNM", quality:"Medium"});
+  shifts[id] = {};
+  const days = getDays();
+  for (let d = 1; d <= days; d++) shifts[id][d] = 'Off';
+  renderNurses(); rebuildGrid(); saveAndRefresh();
+  if (window.innerWidth <= 640) switchTab('left-pane');
+}
+
+function removeNurse(id) {
+  nurses = nurses.filter(n => n.id !== id);
+  delete shifts[id];
+  renderNurses(); rebuildGrid(); saveAndRefresh();
+}
+
+function renderNurses() {
+  const list = document.getElementById('nurse-list');
+  const empty = document.getElementById('nurse-empty');
+  document.getElementById('nurse-count').textContent =
+    `— ${nurses.length} ${nurses.length === 1 ? 'nurse' : 'nurses'}`;
+  list.querySelectorAll('.nc').forEach(c => c.remove());
+  if (!nurses.length) { empty.style.display = ''; return; }
+  empty.style.display = 'none';
+
+  nurses.forEach((n, i) => {
+    const sc = QS[n.quality];
+    const d = document.createElement('div');
+    d.className = 'nc'; d.id = `nc-${n.id}`;
+    d.innerHTML = `
+      <button class="del-btn" onclick="removeNurse(${n.id})">×</button>
+      <div class="nc-row">
+        <div class="nc-num">${i+1}</div>
+        <input type="text" value="${esc(n.name)}" oninput="updN(${n.id},'name',this.value)" placeholder="Name" />
+        <span class="sbadge s${sc}" id="sb-${n.id}">S${sc}</span>
+      </div>
+      <div class="nc-row" style="gap:5px;padding-left:28px">
+        <select onchange="updN(${n.id},'designation',this.value)">
+          <option value="ANM"          ${n.designation==="ANM"?"selected":""}>ANM</option>
+          <option value="GNM"          ${n.designation==="GNM"?"selected":""}>GNM</option>
+          <option value="N.A."         ${n.designation==="N.A."?"selected":""}>N.A.</option>
+          <option value="OT Technician"${n.designation==="OT Technician"?"selected":""}>OT Tech</option>
+        </select>
+        <select onchange="updN(${n.id},'quality',this.value)">
+          <option value="High"   ${n.quality==="High"?"selected":""}>High</option>
+          <option value="Medium" ${n.quality==="Medium"?"selected":""}>Medium</option>
+          <option value="Low"    ${n.quality==="Low"?"selected":""}>Low</option>
+        </select>
+      </div>`;
+    list.appendChild(d);
+  });
+}
+
+function updN(id, field, value) {
+  const n = nurses.find(n => n.id === id);
+  if (!n) return;
+  n[field] = value;
+  if (field === 'quality') {
+    const sc = QS[value];
+    const b = document.getElementById(`sb-${id}`);
+    if (b) { b.className = `sbadge s${sc}`; b.textContent = `S${sc}`; }
+  }
+  if (field === 'name') {
+    const c = document.getElementById(`nn-${id}`);
+    if (c) c.textContent = value || '(unnamed)';
+  }
+  saveAndRefresh();
+}
+
+/* ══════════════════════════════════════════
+   GRID
+══════════════════════════════════════════ */
+function getDays() {
+  return Math.min(31, Math.max(1, parseInt(document.getElementById('day-count').value) || 30));
+}
+
+function onDayCountChange() {
+  const days = getDays();
+  // Ensure all nurses have shift entries up to new day count
+  nurses.forEach(n => {
+    if (!shifts[n.id]) shifts[n.id] = {};
+    for (let d = 1; d <= days; d++) {
+      if (!shifts[n.id][d]) shifts[n.id][d] = 'Off';
+    }
+  });
+  rebuildGrid(); saveAndRefresh();
+}
+
+function initShiftsForNurses() {
+  const days = getDays();
+  nurses.forEach(n => {
+    shifts[n.id] = {};
+    for (let d = 1; d <= days; d++) shifts[n.id][d] = 'Off';
+  });
+}
+
+function rebuildGrid() {
+  const days = getDays();
+  const hr = document.getElementById('duty-hr');
+  const tb = document.getElementById('duty-tb');
+  const ge = document.getElementById('grid-empty');
+  hr.innerHTML = ''; tb.innerHTML = '';
+
+  if (!nurses.length) { ge.style.display = ''; rebuildDaySel(days); return; }
+  ge.style.display = 'none';
+
+  const th0 = document.createElement('th'); th0.textContent = 'Nurse'; hr.appendChild(th0);
+  for (let d = 1; d <= days; d++) {
+    const th = document.createElement('th'); th.textContent = `D${d}`; hr.appendChild(th);
+  }
+
+  nurses.forEach(n => {
+    if (!shifts[n.id]) shifts[n.id] = {};
+    const tr = document.createElement('tr');
+    const td0 = document.createElement('td');
+    td0.innerHTML = `<div class="nnc"><div class="ndot"></div><span id="nn-${n.id}">${esc(n.name)}</span></div>`;
+    tr.appendChild(td0);
+
+    for (let d = 1; d <= days; d++) {
+      const td = document.createElement('td');
+      const val = shifts[n.id][d] || 'Off';
+      const ow = document.createElement('div'); ow.className = 'ow'; ow.id = `ow-${n.id}-${d}`;
+      const sel = document.createElement('select'); sel.className = 'ss'; sel.id = `s-${n.id}-${d}`;
+      SHIFT_OPTS.forEach(opt => {
+        const o = document.createElement('option'); o.value = opt.v; o.textContent = opt.l;
+        if (opt.v === val) o.selected = true; sel.appendChild(o);
+      });
+      sel.addEventListener('change', function() {
+        if (!shifts[n.id]) shifts[n.id] = {};
+        shifts[n.id][d] = this.value;
+        styleCell(n.id, d); saveAndRefresh();
+      });
+      const tip = document.createElement('span'); tip.className = 'tip'; tip.textContent = '⚠ Overload!';
+      ow.appendChild(sel); ow.appendChild(tip); td.appendChild(ow); tr.appendChild(td);
+      styleCell(n.id, d);
+    }
+    tb.appendChild(tr);
+  });
+  rebuildDaySel(days);
+}
+
+function styleCell(nid, day) {
+  const val = (shifts[nid] && shifts[nid][day]) || 'Off';
+  const sel = document.getElementById(`s-${nid}-${day}`);
+  const ow  = document.getElementById(`ow-${nid}-${day}`);
+  if (!sel || !ow) return;
+  const cnt = countShifts(val);
+  sel.className = 'ss';
+  if (cnt > 2) { sel.classList.add('overload'); ow.querySelector('.tip').style.display = ''; }
+  else {
+    ow.querySelector('.tip').style.display = 'none';
+    if      (val === 'Off')     sel.classList.add('so');
+    else if (val === 'Morning') sel.classList.add('sm');
+    else if (val === 'Evening') sel.classList.add('se');
+    else if (val === 'Night')   sel.classList.add('sn');
+    else                        sel.classList.add('sc');
+  }
+}
+function countShifts(v) { return (!v || v === 'Off') ? 0 : v.split(',').length; }
+
+/* ══════════════════════════════════════════
+   DAY SELECTOR
+══════════════════════════════════════════ */
+function rebuildDaySel(days) {
+  const sel = document.getElementById('day-selector');
+  const prev = parseInt(sel.value) || 1;
+  sel.innerHTML = '';
+  for (let d = 1; d <= days; d++) {
+    const o = document.createElement('option'); o.value = d;
+    const [y, m] = currentMonthKey.split('-').map(Number);
+    const date = new Date(y, m-1, d);
+    const dayName = date.toLocaleDateString('en-IN', {weekday:'short'});
+    o.textContent = `Day ${d} (${dayName})`;
+    if (d === prev) o.selected = true; sel.appendChild(o);
+  }
+  renderEval();
+}
+
+/* ══════════════════════════════════════════
+   SCORING
+══════════════════════════════════════════ */
+function computeDay(day) {
+  const snames = ['Morning','Evening','Night'], stats = {};
+  snames.forEach(sh => { stats[sh] = {nurses:[],high:0,medium:0,low:0,base:0,bonus:0,pen:0,final:0}; });
+  nurses.forEach(n => {
+    const val = (shifts[n.id] && shifts[n.id][day]) || 'Off';
+    snames.forEach(sh => {
+      if (val.includes(sh)) {
+        const s = stats[sh]; s.nurses.push(n);
+        if (n.quality==='High') s.high++;
+        else if (n.quality==='Medium') s.medium++;
+        else s.low++;
+        s.base += QS[n.quality];
+      }
+    });
+  });
+  snames.forEach(sh => {
+    const s = stats[sh];
+    if (s.high   >= 1) s.bonus += 2;
+    if (s.medium >= 1) s.bonus += 1;
+    if (s.low    >= 1) s.bonus += 1;
+    if (s.high   === 0) s.pen  += 2;
+    const cats = [s.high>0, s.medium>0, s.low>0].filter(Boolean).length;
+    if (cats <= 1 && s.nurses.length > 0) s.pen += 1;
+    s.final = s.base + s.bonus - s.pen;
+  });
+  return stats;
+}
+function quality(score) { return score >= 6 ? 'good' : score >= 3 ? 'mid' : 'poor'; }
+
+/* ══════════════════════════════════════════
+   EVAL PANEL
+══════════════════════════════════════════ */
+const SMETA = { Morning:{i:'☀️',l:'Morning'}, Evening:{i:'🌤️',l:'Evening'}, Night:{i:'🌙',l:'Night'} };
+
+function renderEval() {
+  const day = parseInt(document.getElementById('day-selector').value) || 1;
+  const cont = document.getElementById('score-cards');
+  const emp  = document.getElementById('eval-empty');
+  cont.querySelectorAll('.sb').forEach(b => b.remove());
+  if (!nurses.length) { if (emp) emp.style.display = ''; return; }
+  if (emp) emp.style.display = 'none';
+  const stats = computeDay(day);
+  ['Morning','Evening','Night'].forEach(sh => {
+    const s = stats[sh];
+    const q  = !s.nurses.length ? 'poor' : quality(s.final);
+    const fc = q==='good' ? 'fg' : q==='mid' ? 'fm' : 'fp';
+    const ft = !s.nurses.length ? '—' : (s.final > 0 ? `+${s.final}` : String(s.final));
+    const block = document.createElement('div');
+    block.className = `sb ${q}`;
+    block.innerHTML = `
+      <div class="sbh">
+        <div class="sbl"><span>${SMETA[sh].i}</span><span>${SMETA[sh].l}</span></div>
+        <span class="fs ${fc}">${ft}</span>
+      </div>
+      <div class="sbb">
+        ${!s.nurses.length ? `<p class="nn">No nurses assigned</p>` : `
+          <div class="sr"><span class="sl">Nurses</span><span class="sv">${s.nurses.length}</span></div>
+          <div class="sr"><span class="sl">Base score</span><span class="sv">${s.base}</span></div>
+          <div class="sr"><span class="sl">Bonus</span><span class="sv" style="color:var(--c-green)">+${s.bonus}</span></div>
+          <div class="sr"><span class="sl">Penalty</span><span class="sv" style="color:var(--c-red)">−${s.pen}</span></div>
+          <div class="pr">
+            ${s.high   ? `<span class="pill ph-p">H×${s.high}</span>` : ''}
+            ${s.medium ? `<span class="pill pm-p">M×${s.medium}</span>` : ''}
+            ${s.low    ? `<span class="pill pl-p">L×${s.low}</span>` : ''}
+          </div>`}
+      </div>`;
+    cont.appendChild(block);
+  });
+}
+
+/* ══════════════════════════════════════════
+   SUMMARY BAR
+══════════════════════════════════════════ */
+function updateSummary() {
+  const days = getDays();
+  let good=0, mid=0, poor=0, ol=0;
+  for (let d=1; d<=days; d++) {
+    const st = computeDay(d);
+    ['Morning','Evening','Night'].forEach(sh => {
+      const s = st[sh]; if (!s.nurses.length) return;
+      const q = quality(s.final);
+      if (q==='good') good++; else if (q==='mid') mid++; else poor++;
+    });
+  }
+  nurses.forEach(n => {
+    for (let d=1; d<=days; d++) {
+      if (countShifts((shifts[n.id]&&shifts[n.id][d])||'Off') > 2) ol++;
+    }
+  });
+  document.getElementById('sum-good').textContent = `${good} Good`;
+  document.getElementById('sum-mid').textContent  = `${mid} Medium`;
+  document.getElementById('sum-poor').textContent = `${poor} Poor`;
+  document.getElementById('sum-ol').textContent   = ol > 0 ? `⚠ ${ol} overload${ol>1?'s':''}` : '';
+}
+
+/* ══════════════════════════════════════════
+   EXCEL EXPORT
+══════════════════════════════════════════ */
+function exportExcel() {
+  if (!nurses.length) { showToast('No nurses to export', 'red'); return; }
+  const days = getDays();
+  const [y, m] = currentMonthKey.split('-').map(Number);
+  const monthLabel = `${MONTHS[m-1]} ${y}`;
+
+  /* ── Sheet 1: Roster ── */
+  const rosterData = [];
+  // Header row
+  const headerRow = ['S.No', 'Name', 'Designation', 'Quality', 'Score'];
+  for (let d = 1; d <= days; d++) {
+    const date = new Date(y, m-1, d);
+    const dayName = date.toLocaleDateString('en-IN', {weekday:'short'});
+    headerRow.push(`${d}\n(${dayName})`);
+  }
+  headerRow.push('Morning Shifts', 'Evening Shifts', 'Night Shifts', 'Total Shifts', 'Off Days');
+  rosterData.push(headerRow);
+
+  nurses.forEach((n, i) => {
+    const row = [
+      i + 1,
+      n.name,
+      n.designation,
+      n.quality,
+      QS[n.quality],
+    ];
+    let morningCount=0, eveningCount=0, nightCount=0, offCount=0;
+    for (let d = 1; d <= days; d++) {
+      const val = (shifts[n.id] && shifts[n.id][d]) || 'Off';
+      row.push(val);
+      if (val === 'Off') offCount++;
+      else {
+        if (val.includes('Morning')) morningCount++;
+        if (val.includes('Evening')) eveningCount++;
+        if (val.includes('Night'))   nightCount++;
+      }
+    }
+    const totalShifts = morningCount + eveningCount + nightCount;
+    row.push(morningCount, eveningCount, nightCount, totalShifts, offCount);
+    rosterData.push(row);
+  });
+
+  /* ── Sheet 2: Day-wise Score Summary ── */
+  const scoreData = [];
+  scoreData.push([`Score Summary — ${monthLabel}`]);
+  scoreData.push([]);
+  scoreData.push(['Day', 'Date', 'Shift', 'Nurses', 'High', 'Medium', 'Low', 'Base', 'Bonus', 'Penalty', 'Final Score', 'Quality']);
+  for (let d = 1; d <= days; d++) {
+    const date = new Date(y, m-1, d);
+    const dateStr = date.toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'});
+    const stats = computeDay(d);
+    ['Morning','Evening','Night'].forEach(sh => {
+      const s = stats[sh];
+      const q = !s.nurses.length ? '—' : quality(s.final) === 'good' ? 'Good' : quality(s.final) === 'mid' ? 'Medium' : 'Poor';
+      scoreData.push([
+        `Day ${d}`, dateStr, sh,
+        s.nurses.length, s.high, s.medium, s.low,
+        s.base, s.bonus, s.pen, s.final, q
+      ]);
+    });
+  }
+
+  /* ── Sheet 3: Nurse summary ── */
+  const nurseSum = [];
+  nurseSum.push([`Nurse Summary — ${monthLabel}`]);
+  nurseSum.push([]);
+  nurseSum.push(['S.No','Name','Designation','Quality','Score','Morning Shifts','Evening Shifts','Night Shifts','Total Shifts','Off Days']);
+  nurses.forEach((n, i) => {
+    let mc=0,ec=0,nc2=0,oc=0;
+    for (let d=1; d<=days; d++) {
+      const v = (shifts[n.id]&&shifts[n.id][d])||'Off';
+      if (v==='Off') oc++;
+      else {
+        if (v.includes('Morning')) mc++;
+        if (v.includes('Evening')) ec++;
+        if (v.includes('Night'))   nc2++;
+      }
+    }
+    nurseSum.push([i+1, n.name, n.designation, n.quality, QS[n.quality], mc, ec, nc2, mc+ec+nc2, oc]);
+  });
+
+  /* ── Build workbook ── */
+  const wb = XLSX.utils.book_new();
+
+  const ws1 = XLSX.utils.aoa_to_sheet(rosterData);
+  // Column widths
+  const colWidths = [{wch:5},{wch:16},{wch:14},{wch:8},{wch:6}];
+  for (let d=0; d<days; d++) colWidths.push({wch:12});
+  colWidths.push({wch:14},{wch:14},{wch:12},{wch:12},{wch:8});
+  ws1['!cols'] = colWidths;
+  XLSX.utils.book_append_sheet(wb, ws1, 'Roster');
+
+  const ws2 = XLSX.utils.aoa_to_sheet(scoreData);
+  ws2['!cols'] = [{wch:7},{wch:14},{wch:10},{wch:8},{wch:6},{wch:8},{wch:6},{wch:6},{wch:6},{wch:8},{wch:11},{wch:8}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Day Scores');
+
+  const ws3 = XLSX.utils.aoa_to_sheet(nurseSum);
+  ws3['!cols'] = [{wch:5},{wch:16},{wch:14},{wch:8},{wch:6},{wch:14},{wch:14},{wch:12},{wch:12},{wch:8}];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Nurse Summary');
+
+  XLSX.writeFile(wb, `NurseRoster_${MONTHS[m-1]}_${y}.xlsx`);
+  showToast(`✓ Downloaded: NurseRoster_${MONTHS[m-1]}_${y}.xlsx`, 'green');
+}
+
+/* ══════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════ */
+let toastTimer = null;
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type ? ' '+type : '');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = ''; }, 3000);
+}
+
+/* ══════════════════════════════════════════
+   COMBINED SAVE + REFRESH
+══════════════════════════════════════════ */
+function saveAndRefresh() { saveAll(); renderEval(); updateSummary(); }
+function refresh() { renderEval(); updateSummary(); }
+
+/* ══════════════════════════════════════════
+   UTILS
+══════════════════════════════════════════ */
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ══════════════════════════════════════════
+   INIT
+══════════════════════════════════════════ */
+(function init() {
+  // Build month selector
+  buildMonthSelector();
+  currentMonthKey = getSelectedMonth();
+  updateMonthBadge();
+
+  // Try loading nurses from storage
+  const hadNurses = loadNurses();
+  if (!hadNurses) {
+    // First time — seed with default nurses
+    DEFAULT_NURSES.forEach(nd => {
+      const id = nextId++;
+      nurses.push({id, ...nd});
+    });
+  }
+
+  // Load shifts for current month
+  const hadShifts = loadShiftsForMonth();
+
+  // Load day count for current month
+  loadDaysForMonth();
+
+  // If no shifts stored, init blank shifts
+  if (!hadShifts) initShiftsForNurses();
+
+  // Render
+  renderNurses();
+  rebuildGrid();
+  refresh();
+
+  // Auto-save on page unload
+  window.addEventListener('beforeunload', saveAll);
+})();
+</script>
+</body>
+</html>
